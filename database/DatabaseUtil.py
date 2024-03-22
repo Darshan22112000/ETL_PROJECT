@@ -176,29 +176,6 @@ class DatabaseUtil:
         return columns
 
     @staticmethod
-    def get_table_as_df(table_name, schema_name='public', filter_column=None, filter_value=None, drop_id=True):
-        session = DatabaseUtil.get_session()
-        try:
-            metadata = MetaData(schema=schema_name)
-            table = Table(table_name, metadata, autoload_with=DatabaseUtil.__engine)
-            query = session.query(table)
-            if filter_column is not None:
-                if type(filter_column) == list:
-                    query = query.filter(or_(table.c[col] == val for col, val in zip(filter_column, filter_value)))
-                else:
-                    query = query.filter(table.c[filter_column] == filter_value)
-
-            df = pd.read_sql(query.statement, session.bind)
-            if drop_id and ('id' in df.columns):
-                df.drop('id', axis=1, inplace=True)
-
-            return {'table_data': df}
-        except Exception as e:
-            raise Exception(e)
-        finally:
-            session.close()
-
-    @staticmethod
     def delete_table_data(table_name, schema_name='public', filter_column=None, filter_value=None,
                           session=None):
         # connection = DatabaseUtil.__engine.connect()
@@ -214,35 +191,6 @@ class DatabaseUtil:
                 # query = delete(table)
                 session_f.query(table).delete(synchronize_session=False)
             # connection.execute(query)
-            if session is None:
-                session_f.commit()
-        except Exception as e:
-            print(traceback.format_exc())
-            session_f.rollback()
-            raise Exception(e)
-        finally:
-            # connection.close()
-            if session is None:
-                session_f.close()
-
-    @staticmethod
-    def delete_multiple_rows(table_name, schema_name, primary_keys, primary_df, session=None):
-        primary_tuple = []
-        metadata = MetaData(schema=schema_name)
-        table = Table(table_name, metadata, autoload_with=DatabaseUtil.__engine)
-        for key in primary_keys:
-            primary_tuple.append(table.c[key])
-        delete_tuples = list(primary_df[primary_keys].itertuples(index=False))
-        # primary_tuple.in_(delete_tuples)
-        # connection = DatabaseUtil.__engine.connect()
-        session_f = DatabaseUtil.get_session() if session is None else session
-        try:
-            chunk_size = 5000
-            for i in range(0, len(delete_tuples), chunk_size):
-                chunk = delete_tuples[i:i + chunk_size]
-                # query = delete(table).where(tuple_(*primary_tuple).in_(chunk))
-                # connection.execute(query)
-                session_f.query(table).filter(tuple_(*primary_tuple).in_(chunk)).delete(synchronize_session=False)
             if session is None:
                 session_f.commit()
         except Exception as e:
