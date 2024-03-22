@@ -41,7 +41,7 @@ class DatabaseUtil:
         # Populate Pconf with json key-value pairs
         Pconf.file(destination_file, encoding='json')
         # Assign json key-value pairs to class variable
-        config = Pconf.get()
+        config = Pconf.get() #Pconf used to read config file
         return config
 
     @classmethod
@@ -74,7 +74,6 @@ class DatabaseUtil:
                              maxConnecting=100,
                              maxPoolSize=400,
                              minPoolSize=200)
-        # DatabaseUtil.__client = MongoClient(uri, maxConnecting=100)
 
     @staticmethod
     def __create_tables():
@@ -112,14 +111,6 @@ class DatabaseUtil:
             return DatabaseUtil.__engine
 
     @staticmethod
-    def get_archival_engine():
-        if DatabaseUtil.archive_engine:
-            return DatabaseUtil.archive_engine
-        else:
-            DatabaseUtil.initialize_database()
-            return DatabaseUtil.archive_engine
-
-    @staticmethod
     def commit_session(session):
         if session:
             try:
@@ -152,23 +143,6 @@ class DatabaseUtil:
         with engine.connect() as conn:
             result = conn.execute(mapper.__table__.insert(), mappings)
 
-    @classmethod
-    def get_db_uri(cls, db_config, mongo=False):
-        driver = db_config['driver'],
-        username = urllib.parse.quote_plus(db_config['username']),
-        password = urllib.parse.quote_plus(db_config['password']),
-        host = db_config['host'],
-        port = db_config['port'],
-        database = db_config['database'],
-        schema = db_config['schema'] if 'schema' in db_config else 'public'
-
-        mongo_uri = f"{driver}:///?Server={host}&Port={port}&Database={database}&User={username}&Password={password}"
-        uri = f"{driver}://{username}:{password}@{host}:{port}/{database}?options=--search_path%3D{schema}"
-
-        if "msdriver" in db_config:
-            uri = "{}?driver={}".format(uri, db_config['msdriver'])
-        return mongo_uri if mongo else uri
-
     @staticmethod
     def get_connection():
         if DatabaseUtil.__engine:
@@ -182,17 +156,6 @@ class DatabaseUtil:
         if connection:
             connection.close()
 
-    @staticmethod
-    def get_class_by_tablename(table_fullname):
-        """Return class reference mapped to table.
-
-        :param table_fullname: String with fullname of table.
-        :return: Class reference or None.
-        """
-
-        for c in DatabaseUtil.__base._decl_class_registry.values():
-            if hasattr(c, '__table__') and c.__table__.name == table_fullname:
-                return c
 
     @staticmethod
     def get_table_columns(table_name, schema_name='public'):
@@ -292,30 +255,6 @@ class DatabaseUtil:
                 session_f.close()
 
     @staticmethod
-    def fetch_multiple_rows(table_name, schema_name, primary_keys, primary_df, chunk_size=2500, session=None):
-        primary_tuple = []
-        metadata = MetaData(schema=schema_name)
-        table = Table(table_name, metadata, autoload_with=DatabaseUtil.__engine)
-        for key in primary_keys:
-            primary_tuple.append(table.c[key])
-        fetch_tuples = list(primary_df[primary_keys].itertuples(index=False))
-
-        session_f = DatabaseUtil.get_session() if session is None else session
-        try:
-            result_df = pd.DataFrame()
-            # chunk_size = 2500
-            for i in range(0, len(fetch_tuples), chunk_size):
-                chunk = fetch_tuples[i:i + chunk_size]
-                sq = session_f.query(table).filter(tuple_(*primary_tuple).in_(chunk))
-                result_df = pd.concat([result_df, pd.read_sql(sq.statement, session_f.bind)])
-            return result_df
-        except Exception as e:
-            raise e
-        finally:
-            if session is None:
-                session_f.close()
-
-    @staticmethod
     def save_df_to_DB_with_session(df, table_name, schema='public', session=None, append=False):
         session_f = DatabaseUtil.get_session() if session is None else session
         cur = session_f.connection().connection.cursor()
@@ -344,21 +283,6 @@ class DatabaseUtil:
                 session_f.close()
             return success
 
-    @staticmethod
-    def get_base():
-        if DatabaseUtil.__base is None:
-            print("Inside DB Base")
-            DatabaseUtil.initialize_database()
-        return DatabaseUtil.__base
-
-
-    @staticmethod
-    def dump_query(query) -> str:
-        return str(
-            query.statement.compile(
-                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
-            )
-        )
 
     @classmethod
     def insert_data(cls, table, data, session=None):
@@ -372,4 +296,19 @@ class DatabaseUtil:
             session.commit()
             DatabaseUtil.close_session(session)
 
-# DatabaseUtil.get_config()
+    @classmethod
+    def get_db_uri(cls, db_config, mongo=False):
+        driver = db_config['driver'],
+        username = urllib.parse.quote_plus(db_config['username']),
+        password = urllib.parse.quote_plus(db_config['password']),
+        host = db_config['host'],
+        port = db_config['port'],
+        database = db_config['database'],
+        schema = db_config['schema'] if 'schema' in db_config else 'public'
+
+        mongo_uri = f"{driver}:///?Server={host}&Port={port}&Database={database}&User={username}&Password={password}"
+        uri = f"{driver}://{username}:{password}@{host}:{port}/{database}?options=--search_path%3D{schema}"
+
+        if "msdriver" in db_config:
+            uri = "{}?driver={}".format(uri, db_config['msdriver'])
+        return mongo_uri if mongo else uri

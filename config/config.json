@@ -1,0 +1,36 @@
+{
+  "default": {
+    "type": "postgres",
+    "driver": "postgresql",
+    "username": "dap",
+    "password": "dap",
+    "host": "localhost",
+    "port": "5432",
+    "database": "motor",
+    "schema": "public"
+  },
+  "postgres": {
+    "type": "postgres",
+    "driver": "postgresql",
+    "username": "dap",
+    "password": "dap",
+    "host": "localhost",
+    "port": "5432",
+    "database": "motor",
+    "schema": "public"
+  },
+  "mongodb": {
+    "username": "root",
+    "password": "root"
+  },
+  "mongodb_sqlalchemy": {
+    "type": "mongodb",
+    "driver": "mongodb",
+    "username": "dap",
+    "password": "dap",
+    "host": "localhost",
+    "port": "27017",
+    "database": "motor",
+    "schema": "public"
+  }
+}
