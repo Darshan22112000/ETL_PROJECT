@@ -246,13 +246,15 @@ class DatabaseUtil:
 
     @classmethod
     def get_db_uri(cls, db_config, mongo=False):
-        driver = db_config['driver'],
-        username = urllib.parse.quote_plus(db_config['username']),
-        password = urllib.parse.quote_plus(db_config['password']),
-        host = db_config['host'],
-        port = db_config['port'],
-        database = db_config['database'],
+        driver = db_config['driver']
+        username = urllib.parse.quote_plus(db_config['username'])
+        password = urllib.parse.quote_plus(db_config['password'])
+        host = db_config['host']
+        port = db_config['port']
+        database = db_config['database']
         schema = db_config['schema'] if 'schema' in db_config else 'public'
+
+
 
         mongo_uri = f"{driver}:///?Server={host}&Port={port}&Database={database}&User={username}&Password={password}"
         uri = f"{driver}://{username}:{password}@{host}:{port}/{database}?options=--search_path%3D{schema}"
