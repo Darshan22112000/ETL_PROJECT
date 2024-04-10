@@ -1,3 +1,4 @@
+import datetime
 import io
 import traceback
 import urllib
@@ -45,7 +46,7 @@ class DatabaseUtil:
         return config
 
     @classmethod
-    def initialize_database(cls, db_config=None):
+    def initialize_postgres_database(cls, db_config=None):
         config = cls.get_config()
         if db_config is None:
             db_config = config['postgres']
@@ -53,10 +54,10 @@ class DatabaseUtil:
         pool_size = db_config['pool_size'] if 'pool_size' in db_config else 50
         DatabaseUtil.__engine = create_engine(db_uri, echo=False, pool_size=pool_size, max_overflow=50)
         DatabaseUtil.__Session = sessionmaker(bind=DatabaseUtil.__engine)
-        DatabaseUtil.temp_session = DatabaseUtil.__Session
-        DatabaseUtil.__base = automap_base()
-        DatabaseUtil.__base.prepare(DatabaseUtil.__engine, reflect=True)
-        DatabaseUtil.__create_tables()
+        # DatabaseUtil.temp_session = DatabaseUtil.__Session
+        # DatabaseUtil.__base = automap_base()
+        # DatabaseUtil.__base.prepare(DatabaseUtil.__engine, reflect=True)
+        DatabaseUtil.__create_postgres_tables()
 
     @classmethod
     def initialize_mongodb(cls):
@@ -76,7 +77,7 @@ class DatabaseUtil:
                              minPoolSize=200)
 
     @staticmethod
-    def __create_tables():
+    def __create_postgres_tables():
         try:
             BaseModel.base.metadata.create_all(DatabaseUtil.__engine)
             if DatabaseUtil.archive_engine:
@@ -86,7 +87,7 @@ class DatabaseUtil:
 
     # This method will return global object of session maker, engine
     @staticmethod
-    def get_session():
+    def get_postgres_session():
         if DatabaseUtil.__Session:
             return DatabaseUtil.__Session()
         else:
@@ -103,7 +104,7 @@ class DatabaseUtil:
 
 
     @staticmethod
-    def get_engine():
+    def get_postgres_engine():
         if DatabaseUtil.__engine:
             return DatabaseUtil.__engine
         else:
@@ -111,7 +112,7 @@ class DatabaseUtil:
             return DatabaseUtil.__engine
 
     @staticmethod
-    def commit_session(session):
+    def commit_postgres_session(session):
         if session:
             try:
                 session.commit()
@@ -122,29 +123,13 @@ class DatabaseUtil:
                 session.close()
 
     @staticmethod
-    def close_session(session):
+    def close_postgres_session(session):
         if session:
             session.close()
 
-    @staticmethod
-    def get_query_df(session, sql_orm):
-        sq = session.query(sql_orm)
-        df = pd.read_sql(sq.statement, session.bind)
-        return df
 
     @staticmethod
-    def bulk_insert_orm(session, mapper, mappings):
-        session.bulk_insert_mappings(mapper, mappings)
-        session.commit()
-
-    @staticmethod
-    def bulk_insert_core(engine, mapper, mappings):
-        # engine.execute(mapper.__table__.insert(), mappings)
-        with engine.connect() as conn:
-            result = conn.execute(mapper.__table__.insert(), mappings)
-
-    @staticmethod
-    def get_connection():
+    def get_postgres_connection():
         if DatabaseUtil.__engine:
             return DatabaseUtil.__engine.connect()
         else:
@@ -152,9 +137,14 @@ class DatabaseUtil:
             return DatabaseUtil.__engine.connect()
 
     @staticmethod
-    def close_connection(connection):
+    def close_postgres_connection(connection):
         if connection:
             connection.close()
+
+    @staticmethod
+    def close_mongo_client_connection(client):
+        if client:
+            client.close()
 
 
     @staticmethod
@@ -179,7 +169,7 @@ class DatabaseUtil:
     def delete_table_data(table_name, schema_name='public', filter_column=None, filter_value=None,
                           session=None):
         # connection = DatabaseUtil.__engine.connect()
-        session_f = DatabaseUtil.get_session() if session is None else session
+        session_f = DatabaseUtil.get_postgres_session() if session is None else session
         try:
             metadata = MetaData(schema=schema_name)
             table = Table(table_name, metadata, autoload_with=DatabaseUtil.__engine)
@@ -203,8 +193,8 @@ class DatabaseUtil:
                 session_f.close()
 
     @staticmethod
-    def save_df_to_DB_with_session(df, table_name, schema='public', session=None, append=False):
-        session_f = DatabaseUtil.get_session() if session is None else session
+    def save_to_postgres(df, table_name, schema='public', session=None, append=False):
+        session_f = DatabaseUtil.get_postgres_session() if session is None else session
         cur = session_f.connection().connection.cursor()
         metadata = MetaData(schema=schema)
         table = Table(table_name, metadata, autoload_with=DatabaseUtil.__engine)
@@ -233,16 +223,16 @@ class DatabaseUtil:
 
 
     @classmethod
-    def insert_data(cls, table, data, session=None):
+    def insert_postgres_data(cls, table, data, session=None):
         commit = False
         if session is None:
             commit = True
-            session = DatabaseUtil.get_session()
+            session = DatabaseUtil.get_postgres_session()
         session.bulk_insert_mappings(table, data.to_dict(orient='records'))
         print("insert complete")
         if commit:
             session.commit()
-            DatabaseUtil.close_session(session)
+            DatabaseUtil.close_postgres_session(session)
 
     @classmethod
     def get_db_uri(cls, db_config, mongo=False):
@@ -254,11 +244,25 @@ class DatabaseUtil:
         database = db_config['database']
         schema = db_config['schema'] if 'schema' in db_config else 'public'
 
-
-
         mongo_uri = f"{driver}:///?Server={host}&Port={port}&Database={database}&User={username}&Password={password}"
         uri = f"{driver}://{username}:{password}@{host}:{port}/{database}?options=--search_path%3D{schema}"
 
         if "msdriver" in db_config:
             uri = "{}?driver={}".format(uri, db_config['msdriver'])
         return mongo_uri if mongo else uri
+
+
+    def truncate_mongo_doc(self, db, collection_name):
+        db[collection_name].delete_many({})
+
+    def insert_mongo_chunk_records(self, db, collection_name, records):
+        DatabaseUtil.truncate_mongo_doc(None, db, collection_name)
+        # collection = db[collection_name]
+        if len(records) > 99999:
+            # records = np.array_split(records, 999)
+            records = [records[i: i + 50000] for i in range(0, len(records), 50000)]
+            for record in list(records):
+                db[collection_name].insert_many(list(record), ordered=False)
+                print(datetime.datetime.now())  # 10 mins 30 secs (7.3 lakh records)
+        else:
+            db.motor_collisions.insert_many(records)

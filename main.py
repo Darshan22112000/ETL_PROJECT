@@ -75,10 +75,10 @@ def predict_using_decision_tree(X_train, X_test, y_train, y_test):
 
 
 # fetch data from postgres using sqlalchemy orm
-session = DatabaseUtil.get_session()
+session = DatabaseUtil.get_postgres_session()
 sq = session.query(Collisions)
 collisions = pd.read_sql(sq.statement, session.bind)
-DatabaseUtil.close_session(session)
+DatabaseUtil.close_postgres_session(session)
 
 #EDA
 collisions.hist(layout=(1, 9), figsize=(30, 5))

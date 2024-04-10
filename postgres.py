@@ -22,8 +22,8 @@ collisions.rename(columns=map_collision_columns, inplace=True)
 collisions_df = collisions[map_collision_columns.values()]
 
 try:
-    session = DatabaseUtil.get_session()
-    DatabaseUtil.save_df_to_DB_with_session(collisions_df, str(Collisions.metadata.sorted_tables[0]).split('.')[1],
+    session = DatabaseUtil.get_postgres_session()
+    DatabaseUtil.save_to_postgres(collisions_df, str(Collisions.metadata.sorted_tables[0]).split('.')[1],
                                             append=False, session=session) #truncate and insert
     # DatabaseUtil.insert_data(Collisions, collisions_df, session)
     session.commit()
@@ -31,5 +31,5 @@ except Exception as err:
     session.rollback()
     raise err
 finally:
-    DatabaseUtil.close_session(session)
+    DatabaseUtil.close_postgres_session(session)
 

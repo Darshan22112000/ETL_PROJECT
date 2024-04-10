@@ -14,6 +14,16 @@ from pymongo import InsertOne, WriteConcern
 
 def truncate_n_insert_chunk_records(db, records):
     db.motor_collisions.delete_many({})
+    if len(records) > 99999: # cant insert more than 1 lakh records in a session/ also cant use insert_many more than 100 times in single session
+        # records = np.array_split(records, 999)
+        records = [records[i: i+50000] for i in range(0, len(records), 50000)]
+        for record in list(records):
+            db.motor_collisions.insert_many(list(record), ordered=False)
+            print(datetime.datetime.now())                           #10 mins 30 secs (7.3 lakh records)
+    else:
+        db.motor_collisions.insert_many(records)
+
+def insert_chunk_records(db, records):
     if len(records) > 99999:
         # records = np.array_split(records, 999)
         records = [records[i: i+50000] for i in range(0, len(records), 50000)]
@@ -58,9 +68,20 @@ async def csv_handler():
         # read csv
         cwd = os.getcwd()
         # dir = os.path.dirname(cwd)
-        path = os.path.join(cwd, 'Data', 'Motor_Vehicle_Collisions_-_Crashes.csv').replace("\\", '/')
+        path = os.path.join(cwd, 'Data', 'crash_json.json').replace("\\", '/')
         filename = path
-        collisions = pd.read_csv(filename, usecols=map_collision_columns.keys())
+        # collisions = pd.read_csv(filename, usecols=map_collision_columns.keys())
+
+        # changes for loading json
+        data = json.load(open(filename))
+        collisions = pd.DataFrame(data["data"])
+
+        new_names = pd.DataFrame(data['meta']['view']['columns'])['name'].tolist()
+        old_names = collisions.keys().tolist()
+        col_rename = list(zip(old_names, new_names))
+        col_rename = {key: value for key, value in col_rename}
+        collisions.rename(columns=col_rename, inplace=True)
+        collisions = collisions[list(map_collision_columns.keys())]
 
         # data cleaning/processing
         collisions.replace({np.nan: None}, inplace=True)
@@ -75,7 +96,7 @@ async def csv_handler():
         client = DatabaseUtil.get_mongo_client()
         db = client.motor_db
         # truncate_n_insert_chunk_records(db, records)
-        response_dict = await truncate_n_insert_async_loop(db, 'motor_collisions', records)
+        response_dict = truncate_n_insert_chunk_records(db, records)
         client.close()
         print(f'insert done in: {begin - datetime.datetime.now()}')
     except OSError as error:
