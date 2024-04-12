@@ -12,28 +12,30 @@ from database.DatabaseUtil import DatabaseUtil
 from database.models import map_collision_columns
 from pymongo import InsertOne, WriteConcern
 
-def truncate_n_insert_chunk_records(db, records):
-    db.motor_collisions.delete_many({})
+def truncate_n_insert_chunk_records(db, records, collection_name):
+    collection = db[collection_name]
+    collection.delete_many({})
     if len(records) > 99999: # cant insert more than 1 lakh records in a session/ also cant use insert_many more than 100 times in single session
         # records = np.array_split(records, 999)
         records = [records[i: i+50000] for i in range(0, len(records), 50000)]
         for record in list(records):
-            db.motor_collisions.insert_many(list(record), ordered=False)
-            print(datetime.datetime.now())                           #10 mins 30 secs (7.3 lakh records)
+            collection.insert_many(list(record), ordered=False)
+        print(datetime.datetime.now())           #10 mins 30 secs (7.3 lakh records) / 3 mins 30 sec(20 Lakh records(docker))
     else:
-        db.motor_collisions.insert_many(records)
+        collection.insert_many(records)
 
-def insert_chunk_records(db, records):
+def insert_chunk_records(db, records, collection_name):
+    collection = db[collection_name]
     if len(records) > 99999:
         # records = np.array_split(records, 999)
         records = [records[i: i+50000] for i in range(0, len(records), 50000)]
         for record in list(records):
-            db.motor_collisions.insert_many(list(record), ordered=False)
+            collection.insert_many(list(record), ordered=False)
             print(datetime.datetime.now())                           #10 mins 30 secs (7.3 lakh records)
     else:
-        db.motor_collisions.insert_many(records)
+        collection.insert_many(records)
 
-async def truncate_n_insert_async_loop(db, collection_name, records):
+async def truncate_n_insert_async_loop(db, records, collection_name):
     db[collection_name].delete_many({})
     # insert chunk of records asynchronously using async loop executer
     loop = asyncio.get_running_loop()
@@ -49,7 +51,7 @@ async def truncate_n_insert_async_loop(db, collection_name, records):
         # [response_dict.update(t.result()) for t in list(response)]
         return response
     else:
-        db.motor_collisions.insert_many(records)
+        db[collection_name].insert_many(records)
 
 
 def to_dict_custom(df):
@@ -68,7 +70,7 @@ async def csv_handler():
         # read csv
         cwd = os.getcwd()
         # dir = os.path.dirname(cwd)
-        path = os.path.join(cwd, 'Data', 'crash_json.json').replace("\\", '/')
+        path = os.path.join(cwd, 'Data', 'crash.json').replace("\\", '/')
         filename = path
         # collisions = pd.read_csv(filename, usecols=map_collision_columns.keys())
 
@@ -94,9 +96,8 @@ async def csv_handler():
         # records = collisions_df.to_dict(orient='records') #slow
         records = to_dict_custom(collisions_df) #3 times faster
         client = DatabaseUtil.get_mongo_client()
-        db = client.motor_db
-        # truncate_n_insert_chunk_records(db, records)
-        response_dict = truncate_n_insert_chunk_records(db, records)
+        db = client.dap
+        response_dict = truncate_n_insert_chunk_records(db, records, 'crash')
         client.close()
         print(f'insert done in: {begin - datetime.datetime.now()}')
     except OSError as error:

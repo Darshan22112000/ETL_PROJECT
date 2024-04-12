@@ -19,18 +19,14 @@
     "database": "motor",
     "schema": "public"
   },
-  "mongodb": {
+  "mongodb_atlas": {
     "username": "root",
     "password": "root"
   },
-  "mongodb_sqlalchemy": {
-    "type": "mongodb",
-    "driver": "mongodb",
+  "mongodb": {
     "username": "dap",
     "password": "dap",
-    "host": "localhost",
-    "port": "27017",
-    "database": "motor",
-    "schema": "public"
+    "database": "dap",
+    "port": 27017
   }
 }

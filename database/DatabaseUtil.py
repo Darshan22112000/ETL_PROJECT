@@ -54,9 +54,6 @@ class DatabaseUtil:
         pool_size = db_config['pool_size'] if 'pool_size' in db_config else 50
         DatabaseUtil.__engine = create_engine(db_uri, echo=False, pool_size=pool_size, max_overflow=50)
         DatabaseUtil.__Session = sessionmaker(bind=DatabaseUtil.__engine)
-        # DatabaseUtil.temp_session = DatabaseUtil.__Session
-        # DatabaseUtil.__base = automap_base()
-        # DatabaseUtil.__base.prepare(DatabaseUtil.__engine, reflect=True)
         DatabaseUtil.__create_postgres_tables()
 
     @classmethod
@@ -64,7 +61,10 @@ class DatabaseUtil:
         config = DatabaseUtil.get_config()['mongodb']
         username = config['username']
         password = config['password']
-        uri = f'mongodb+srv://{username}:{password}@motor.3w7ehsz.mongodb.net/?w=majority&connectTimeoutMS=36000000&wtimeoutMS=0&socketTimeoutMS=3600000'
+        database = config['database']
+        port = config['port']
+        # uri = f'mongodb+srv://{username}:{password}@motor.3w7ehsz.mongodb.net/?w=majority&connectTimeoutMS=36000000&wtimeoutMS=0&socketTimeoutMS=3600000'
+        uri = f'mongodb://{username}:{password}@localhost:{port}'
         DatabaseUtil.__client = MongoClient(uri, server_api=ServerApi('1'), retryWrites=True,
                              serverSelectionTimeoutMS=5000,
                              waitQueueTimeoutMS=200,
@@ -80,8 +80,6 @@ class DatabaseUtil:
     def __create_postgres_tables():
         try:
             BaseModel.base.metadata.create_all(DatabaseUtil.__engine)
-            if DatabaseUtil.archive_engine:
-                BaseModel.base.metadata.create_all(DatabaseUtil.archive_engine)
         except Exception as e:
             print(str(e))
 
@@ -91,7 +89,7 @@ class DatabaseUtil:
         if DatabaseUtil.__Session:
             return DatabaseUtil.__Session()
         else:
-            DatabaseUtil.initialize_database()
+            DatabaseUtil.initialize_postgres_database()
             return DatabaseUtil.__Session()
 
     @staticmethod
@@ -108,7 +106,7 @@ class DatabaseUtil:
         if DatabaseUtil.__engine:
             return DatabaseUtil.__engine
         else:
-            DatabaseUtil.initialize_database()
+            DatabaseUtil.initialize_postgres_database()
             return DatabaseUtil.__engine
 
     @staticmethod
@@ -133,7 +131,7 @@ class DatabaseUtil:
         if DatabaseUtil.__engine:
             return DatabaseUtil.__engine.connect()
         else:
-            DatabaseUtil.initialize_database()
+            DatabaseUtil.initialize_postgres_database()
             return DatabaseUtil.__engine.connect()
 
     @staticmethod
@@ -142,7 +140,7 @@ class DatabaseUtil:
             connection.close()
 
     @staticmethod
-    def close_mongo_client_connection(client):
+    def close_mongo_client(client):
         if client:
             client.close()
 
@@ -252,17 +250,3 @@ class DatabaseUtil:
         return mongo_uri if mongo else uri
 
 
-    def truncate_mongo_doc(self, db, collection_name):
-        db[collection_name].delete_many({})
-
-    def insert_mongo_chunk_records(self, db, collection_name, records):
-        DatabaseUtil.truncate_mongo_doc(None, db, collection_name)
-        # collection = db[collection_name]
-        if len(records) > 99999:
-            # records = np.array_split(records, 999)
-            records = [records[i: i + 50000] for i in range(0, len(records), 50000)]
-            for record in list(records):
-                db[collection_name].insert_many(list(record), ordered=False)
-                print(datetime.datetime.now())  # 10 mins 30 secs (7.3 lakh records)
-        else:
-            db.motor_collisions.insert_many(records)
