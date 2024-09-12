@@ -30,7 +30,7 @@ iii. docker-compose.yml
 7. Create a new database in your PostgresSQL and in MongoDB using ddl.sql
 
 8. Git clone project:- motocollision in your system, run below cmd
-git clone https://github.com/Kalyani-NCI/motorcollison.git
+git clone https://github.com/Darshan22112000/etl_project.git
 
 9. Open project in IDE
 
