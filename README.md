@@ -1,11 +1,11 @@
-# ETL project : Motor Collison
-ETL pipeline in python, mongodb, postgres
+# DAP Project : Motor Collison
 
 Dataset URLs:
 https://catalog.data.gov/dataset/motor-vehicle-collisions-crashes
 https://catalog.data.gov/dataset/motor-vehicle-collisions-vehicles
 https://catalog.data.gov/dataset/motor-vehicle-collisions-person
-
+or 
+https://github.com/Darshan22112000/etl_project/tree/main/Data
 
 Steps to be followed for code execution:
 
@@ -50,4 +50,5 @@ git clone https://github.com/Darshan22112000/etl_project.git
 python .\luigi_etl.py
 
 16. When the job is completed, a new tab will open containing the Bokeh visualisation.
+
 

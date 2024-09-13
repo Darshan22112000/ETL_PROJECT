@@ -3,6 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
+
+from bokeh.io import output_notebook, show
+from bokeh.models import ColumnDataSource
+from bokeh.plotting import figure
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.metrics import mean_squared_error
@@ -11,9 +15,9 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeRegressor
-
+from statsmodels.graphics.gofplots import qqplot
 from database.DatabaseUtil import DatabaseUtil
-from database.models import Collisions
+from database.models import Crash, Person, Vehicle
 
 
 def predict_using_randon_forest(X_train, X_test, y_train, y_test):
@@ -73,65 +77,63 @@ def predict_using_decision_tree(X_train, X_test, y_train, y_test):
     print(f'Decision Tree Mean Squared Error: {tree_mse}')
     return tree_mse, tree_predictions
 
+def crash_model():
+    # fetch data from postgres using sqlalchemy orm
+    session = DatabaseUtil.get_postgres_session()
+    sq = session.query(Crash)
+    collisions = pd.read_sql(sq.statement, session.bind)
+    DatabaseUtil.close_postgres_session(session)
 
-# fetch data from postgres using sqlalchemy orm
-session = DatabaseUtil.get_postgres_session()
-sq = session.query(Collisions)
-collisions = pd.read_sql(sq.statement, session.bind)
-DatabaseUtil.close_postgres_session(session)
+    # #EDA
+    # collisions.hist(layout=(1, 9), figsize=(30, 5))
+    # plt.show()
 
-#EDA
-collisions.hist(layout=(1, 9), figsize=(30, 5))
-plt.show()
+    #categorical data to numbers
+    LE = LabelEncoder()
+    data = collisions.apply(LE.fit_transform)
 
-#categorical data to numbers
-LE = LabelEncoder()
-data = collisions.apply(LE.fit_transform)
+    # #EDA HEATMAP
+    # # Calculate the correlation matrix
+    # correlation_matrix = data.corr()
+    # # Create a heatmap using Seaborn
+    # plt.figure(figsize=(10, 8))
+    # sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+    # plt.title('Correlation Heatmap')
+    # plt.show()
 
-#EDA HEATMAP
-# # Calculate the correlation matrix
-# correlation_matrix = data.corr()
-# # Create a heatmap using Seaborn
-# plt.figure(figsize=(10, 8))
-# sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-# plt.title('Correlation Heatmap')
-# plt.show()
+    # unsampling / Define independent variables (features) and dependent variable (target)
+    X = data[['crash_date', 'crash_time', 'on_street_name', 'cross_street_name', 'borough', 'contributing_factor_vehicle_1',
+              'contributing_factor_vehicle_2', 'vehicle_type_code_1', 'vehicle_type_code_2', 'vehicle_type_code_3']]
+    y = data[['persons_injured', 'persons_killed']]
 
-# unsampling / Define independent variables (features) and dependent variable (target)
-X = data[['crash_date', 'crash_time', 'on_street_name', 'cross_street_name', 'borough', 'contributing_factor_vehicle_1',
-          'contributing_factor_vehicle_2', 'vehicle_type_code_1', 'vehicle_type_code_2', 'vehicle_type_code_3']]
-y = data[['persons_injured', 'persons_killed', 'motorist_injured', 'motorist_killed', 'pedestrians_injured',
-                                    'pedestrians_killed', 'cyclist_injured', 'cyclist_killed']]
-# y = data[['NUMBER OF PERSONS KILLED', ]]
+    # Split the dataset into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
 
-# Split the dataset into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+    # Make predictions on the testing set
+    mse, predictions = predict_using_decision_tree(X_train, X_test, y_train, y_test)
 
-# Make predictions on the testing set
-mse, predictions = predict_using_decision_tree(X_train, X_test, y_train, y_test)
+    # Plot actual values vs predictions
+    # plt.figure(figsize=(10, 6))
+    # plt.scatter(y_test, np.round(predictions), color='blue', label='Actual', alpha=0.5)
+    # plt.scatter(y_test, np.round(predictions), color='yellow', label='Predicted', alpha=0.5)
+    # plt.title('Actual vs Predicted Number of People Killed/Injured')
+    # plt.xlabel('Actual Values')
+    # plt.ylabel('Predicted Values')
+    # plt.grid(True)
+    # plt.legend()
+    # plt.show()
 
-# Plot actual values vs predictions
-plt.figure(figsize=(10, 6))
-plt.scatter(y_test, np.round(predictions), color='blue', label='Actual', alpha=0.5)
-plt.scatter(y_test, np.round(predictions), color='yellow', label='Predicted', alpha=0.5)
-plt.title('Actual vs Predicted Number of People Killed/Injured')
-plt.xlabel('Actual Values')
-plt.ylabel('Predicted Values')
-plt.grid(True)
-plt.legend()
-plt.show()
-print()
+    # # Calculate the residuals
+    # residuals = y_test - predictions
+    #
+    # # Create QQ plot for residuals
+    # qqplot(residuals, line='s')
+    # plt.title('QQ Plot of Residuals')
+    # plt.show()
+    # Create QQ plot for residuals
+    # Calculate the residuals
 
-
-
-
-
-
-
-
-
-
-
+    return X_train, X_test, y_train, y_test, mse, predictions
 
 
-
+# crash_model()

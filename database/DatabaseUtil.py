@@ -1,5 +1,6 @@
 import datetime
 import io
+import json
 import traceback
 import urllib
 
@@ -12,12 +13,11 @@ from sqlalchemy.dialects import postgresql
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from contextlib import contextmanager
-from sqlalchemy import create_engine, MetaData, Table, tuple_, or_, URL
+from sqlalchemy import create_engine, MetaData, Table, tuple_, or_
 from sqlalchemy.engine import reflection
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import sessionmaker, Session
 from database.base_model import BaseModel
-
 
 class DatabaseUtil:
     __engine = None
@@ -83,6 +83,7 @@ class DatabaseUtil:
         except Exception as e:
             print(str(e))
 
+
     # This method will return global object of session maker, engine
     @staticmethod
     def get_postgres_session():
@@ -108,6 +109,18 @@ class DatabaseUtil:
         else:
             DatabaseUtil.initialize_postgres_database()
             return DatabaseUtil.__engine
+
+    @staticmethod
+    def drop_postgres_table(table_name):
+        try:
+            engine = DatabaseUtil.get_postgres_engine()
+            metadata = MetaData()
+            table = Table(table_name, metadata, autoload_with=engine)
+            # Drop the table if it already exists
+            table.drop(engine, checkfirst=True)
+            BaseModel.base.metadata.create_all(DatabaseUtil.__engine) # recreate all tables from data models
+        except Exception as e:
+            print(str(e))
 
     @staticmethod
     def commit_postgres_session(session):
@@ -144,93 +157,6 @@ class DatabaseUtil:
         if client:
             client.close()
 
-
-    @staticmethod
-    def get_table_columns(table_name, schema_name='public'):
-        """Return table columns from specified schema.
-
-        :param table_name: String with name of table.
-        :param schema_name: String with name of database schema.
-        :return: Columns or None.
-        """
-        columns = []
-        try:
-            inspector = reflection.Inspector.from_engine(DatabaseUtil.__engine)
-            columns = inspector.get_columns(table_name, schema=schema_name)
-        except Exception as e:
-            print(e)
-            DatabaseUtil.__logger.error(e)
-            columns = []
-        return columns
-
-    @staticmethod
-    def delete_table_data(table_name, schema_name='public', filter_column=None, filter_value=None,
-                          session=None):
-        # connection = DatabaseUtil.__engine.connect()
-        session_f = DatabaseUtil.get_postgres_session() if session is None else session
-        try:
-            metadata = MetaData(schema=schema_name)
-            table = Table(table_name, metadata, autoload_with=DatabaseUtil.__engine)
-            if filter_column is not None:
-                # query = delete(table).where((table.c[filter_column] == filter_value))
-                session_f.query(table).filter((table.c[filter_column] == filter_value)).delete(
-                    synchronize_session=False)
-            else:
-                # query = delete(table)
-                session_f.query(table).delete(synchronize_session=False)
-            # connection.execute(query)
-            if session is None:
-                session_f.commit()
-        except Exception as e:
-            print(traceback.format_exc())
-            session_f.rollback()
-            raise Exception(e)
-        finally:
-            # connection.close()
-            if session is None:
-                session_f.close()
-
-    @staticmethod
-    def save_to_postgres(df, table_name, schema='public', session=None, append=False):
-        session_f = DatabaseUtil.get_postgres_session() if session is None else session
-        cur = session_f.connection().connection.cursor()
-        metadata = MetaData(schema=schema)
-        table = Table(table_name, metadata, autoload_with=DatabaseUtil.__engine)
-        output = io.StringIO()
-        success = True
-        common_cols = {i.name for i in table.columns}.intersection(set(df.columns))
-        cols = [col for col in df.columns if col in common_cols]
-        try:
-            if not append:
-                DatabaseUtil.delete_table_data(table_name=table_name, schema_name=schema, session=session)
-            columns_with_quotes = [f"{col}" for col in cols]
-            df[cols].to_csv(output, sep='\t', header=False, index=False)
-            output.seek(0)
-            cur.copy_from(output, table_name, sep='\t', columns=columns_with_quotes, null="")  # null values become ''
-            if session is None:
-                session_f.commit()
-
-        except Exception as e:
-            success = False  # Failed
-            print(traceback.format_exc())
-            raise Exception(e)
-        finally:
-            if session is None:
-                session_f.close()
-            return success
-
-
-    @classmethod
-    def insert_postgres_data(cls, table, data, session=None):
-        commit = False
-        if session is None:
-            commit = True
-            session = DatabaseUtil.get_postgres_session()
-        session.bulk_insert_mappings(table, data.to_dict(orient='records'))
-        print("insert complete")
-        if commit:
-            session.commit()
-            DatabaseUtil.close_postgres_session(session)
 
     @classmethod
     def get_db_uri(cls, db_config, mongo=False):

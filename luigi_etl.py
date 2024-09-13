@@ -8,15 +8,19 @@ import asyncio
 
 from sqlalchemy import MetaData, Table
 
+from Analysis.luigi_analyse import Visualize_run_model
 from database.DatabaseUtil import DatabaseUtil
 from database.models import map_crash_columns, Crash, Person, Vehicle, map_person_columns, map_vehicle_columns
-from IO_ops import IO_ops
+from database.IO_ops import IO_ops
 
 
 class Extract_data(luigi.Task):
     collection_name = luigi.Parameter()
+
     def output(self):
-        return luigi.LocalTarget(f'{self.collection_name}_data.csv')
+        cwd = os.getcwd()
+        csv_path = os.path.join(cwd, 'Data', f'{self.collection_name}_data.csv').replace("\\", '/')
+        return luigi.LocalTarget(csv_path)
 
     def run(self):
         # read csv
@@ -34,7 +38,8 @@ class Extract_data(luigi.Task):
             df = df[list(map_vehicle_columns.keys())]
 
         # Save DataFrame as CSV
-        df.to_csv(f'{self.collection_name}_data.csv', index=False)
+        csv_path = os.path.join(cwd, 'Data', f'{self.collection_name}_data.csv').replace("\\", '/')
+        df.to_csv(csv_path, index=False)
         print("extract ran")
 
 
@@ -44,7 +49,9 @@ class Save_to_mongo(luigi.Task):
         return Extract_data(collection_name=self.collection_name)
 
     def output(self):
-        return luigi.LocalTarget(f'{self.collection_name}_data.csv')
+        cwd = os.getcwd()
+        csv_path = os.path.join(cwd, 'Data', f'{self.collection_name}_data.csv').replace("\\", '/')
+        return luigi.LocalTarget(csv_path)
 
     def run(self):
         data = pd.read_csv(self.input().path)
@@ -52,7 +59,7 @@ class Save_to_mongo(luigi.Task):
         client = DatabaseUtil.get_mongo_client()
         db = client.dap
         data = IO_ops.df_to_dict_custom(data)
-        IO_ops.insert_mongo_chunk_records(IO_ops, db, self.collection_name, data)
+        IO_ops.insert_mongo_chunk_records(db, self.collection_name, data)
         print(f"{self.collection_name} task done")
 
 class fetch_from_mongo_and_save_to_postgres(luigi.Task):
@@ -67,6 +74,14 @@ class fetch_from_mongo_and_save_to_postgres(luigi.Task):
         # fetch all collections
         collection = db[self.collection_name]
         df = pd.DataFrame(list(collection.find()))
+
+        # print(df.summary())
+        print(df.head())
+        print(df.columns)
+        print(df.isnull())
+        print(df.describe())
+        print(df.shape)
+        print(df.count())
 
         # data cleaning/processing
         df.replace({np.nan: None}, inplace=True)
@@ -102,16 +117,22 @@ class fetch_from_mongo_and_save_to_postgres(luigi.Task):
         df = df.drop_duplicates()
         try:
             session = DatabaseUtil.get_postgres_session()
-            DatabaseUtil.save_to_postgres(df, self.collection_name, append=False, session=session)  # truncate and insert
+            IO_ops.save_to_postgres(df, self.collection_name, append=False, session=session)  # truncate and insert
             session.commit()
         except Exception as err:
             session.rollback()
             raise err
         finally:
             DatabaseUtil.close_postgres_session(session)
-            # Save DataFrame as CSV
-            df.to_csv(f'{self.collection_name}_postgres_data.csv', index=False)
-            print("fetch ran")
+            # remove temp file
+            cwd = os.getcwd()
+            csv_path = os.path.join(cwd, 'Data', f'{self.collection_name}_data.csv').replace("\\", '/')
+            try:
+                os.remove(csv_path)
+            except:
+                pass
+            finally:
+                print(f"fetch ran, removed {self.collection_name} temp files")
 
 
 # if __name__ == '__main__':
@@ -132,4 +153,8 @@ async def run_luigi_tasks():
     ]
     await asyncio.gather(*[build_luigi_task(task) for task in tasks])
 
+begin=datetime.datetime.now()
 asyncio.run(run_luigi_tasks())
+luigi.build([Visualize_run_model()], local_scheduler=True)
+# print(f'start_time: {begin}, end_time: {datetime.datetime.now()}')
+print(f'run_time: {datetime.datetime.now() - begin} seconds')

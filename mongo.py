@@ -9,7 +9,7 @@ import numpy as np
 from multiprocessing import Pool
 
 from database.DatabaseUtil import DatabaseUtil
-from database.models import map_collision_columns
+from database.models import map_crash_columns, map_person_columns, map_vehicle_columns
 from pymongo import InsertOne, WriteConcern
 
 def truncate_n_insert_chunk_records(db, records, collection_name):
@@ -62,53 +62,102 @@ def to_dict_custom(df):
         record = {col: col_arr_map[col][i] for col in cols}
         records.append(record)
     return records
+def insert_crash():
+    begin = datetime.datetime.now()
+    print(begin)
+    # read csv
+    cwd = os.getcwd()
+    # dir = os.path.dirname(cwd)
+    path = os.path.join(cwd, 'Data', 'crash.json').replace("\\", '/')
+    filename = path
+    # collisions = pd.read_csv(filename, usecols=map_collision_columns.keys())
 
-async def csv_handler():
+    # loading json
+    data = json.load(open(filename))
+    collisions = pd.DataFrame(data)
+
+    # collisions = pd.DataFrame(data["data"])
+    # new_names = pd.DataFrame(data['meta']['view']['columns'])['name'].tolist()
+    # old_names = collisions.keys().tolist()
+    # col_rename = list(zip(old_names, new_names))
+    # col_rename = {key: value for key, value in col_rename}
+    # collisions.rename(columns=col_rename, inplace=True)
+    # collisions = collisions[list(map_crash_columns.keys())]
+
+    # data cleaning/processing
+    collisions.replace({np.nan: None}, inplace=True)
+    collisions['CRASH TIME'] = pd.to_datetime(collisions['CRASH TIME'], format='mixed')
+    collisions = collisions.loc[~collisions['CONTRIBUTING FACTOR VEHICLE 1'].isna()]
+    collisions.rename(columns=map_crash_columns, inplace=True)
+    collisions_df = collisions[map_crash_columns.values()]
+
+    # convert df to json and insert to mongodb
+    # records = collisions_df.to_dict(orient='records') #slow
+    records = to_dict_custom(collisions_df)  # 3 times faster
+    client = DatabaseUtil.get_mongo_client()
+    db = client.dap
+    response_dict = truncate_n_insert_chunk_records(db, records, 'crash')
+    client.close()
+    print(f'insert done in: {begin - datetime.datetime.now()}')
+
+def insert_person():
+    begin = datetime.datetime.now()
+    print(begin)
+    # read csv
+    cwd = os.getcwd()
+    # dir = os.path.dirname(cwd)
+    path = os.path.join(cwd, 'Data', 'person.json').replace("\\", '/')
+    filename = path
+    # df = pd.read_csv(filename, usecols=map_collision_columns.keys())
+    # loading json
+    data = json.load(open(filename))
+    df = pd.DataFrame(data)
+    # data cleaning/processing
+    df.replace({np.nan: None}, inplace=True)
+    df['CRASH_TIME'] = pd.to_datetime(df['CRASH_TIME'], format='mixed')
+    df.rename(columns=map_person_columns, inplace=True)
+    df = df[map_person_columns.values()]
+
+    records = to_dict_custom(df)  # 3 times faster
+    client = DatabaseUtil.get_mongo_client()
+    db = client.dap
+    response_dict = truncate_n_insert_chunk_records(db, records, 'person')
+    client.close()
+    print(f'insert done in: {begin - datetime.datetime.now()}')
+def insert_to_mongo(collection_name=None):
+    # read csv
+    cwd = os.getcwd()
+    # dir = os.path.dirname(cwd)
+    path = os.path.join(cwd, 'Data', f'{collection_name}.json').replace("\\", '/')
+    filename = path
+    # loading json
+    data = json.load(open(filename))
+    df = pd.DataFrame(data)
+    if collection_name == 'crash':
+        df = df[list(map_crash_columns.keys())]
+    elif collection_name == 'person':
+        df = df[list(map_person_columns.keys())]
+    elif collection_name == 'vehicle':
+        df = df[list(map_vehicle_columns.keys())]
+    records = to_dict_custom(df)  # 3 times faster
+    client = DatabaseUtil.get_mongo_client()
+    db = client.dap
+    response_dict = truncate_n_insert_chunk_records(db, records, collection_name)
+    client.close()
+async def json_handler():
     try:
-        begin = datetime.datetime.now()
-        print(begin)
-        # read csv
-        cwd = os.getcwd()
-        # dir = os.path.dirname(cwd)
-        path = os.path.join(cwd, 'Data', 'crash.json').replace("\\", '/')
-        filename = path
-        # collisions = pd.read_csv(filename, usecols=map_collision_columns.keys())
+        insert_to_mongo('crash')
+        insert_to_mongo('person')
 
-        # changes for loading json
-        data = json.load(open(filename))
-        collisions = pd.DataFrame(data["data"])
-
-        new_names = pd.DataFrame(data['meta']['view']['columns'])['name'].tolist()
-        old_names = collisions.keys().tolist()
-        col_rename = list(zip(old_names, new_names))
-        col_rename = {key: value for key, value in col_rename}
-        collisions.rename(columns=col_rename, inplace=True)
-        collisions = collisions[list(map_collision_columns.keys())]
-
-        # data cleaning/processing
-        collisions.replace({np.nan: None}, inplace=True)
-        collisions['CRASH TIME'] = pd.to_datetime(collisions['CRASH TIME'], format='mixed')
-        collisions = collisions.loc[~collisions['CONTRIBUTING FACTOR VEHICLE 1'].isna()]
-        collisions.rename(columns=map_collision_columns, inplace=True)
-        collisions_df = collisions[map_collision_columns.values()]
-
-        # convert df to json and insert to mongodb
-        # records = collisions_df.to_dict(orient='records') #slow
-        records = to_dict_custom(collisions_df) #3 times faster
-        client = DatabaseUtil.get_mongo_client()
-        db = client.dap
-        response_dict = truncate_n_insert_chunk_records(db, records, 'crash')
-        client.close()
-        print(f'insert done in: {begin - datetime.datetime.now()}')
     except OSError as error:
         print(error)
     except FileNotFoundError:
-        print(f'File not found on path: {filename}')
+        print(f'File not found on path:')
     except IOError:
-        print(f'Could not read from the file: {filename}')
+        print(f'Could not read from the file:')
     finally:
         pass
 
-asyncio.run(csv_handler())
+asyncio.run(json_handler())
 
 

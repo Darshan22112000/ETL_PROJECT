@@ -37,7 +37,8 @@ class Crash(BaseModel.base):
 class Person(BaseModel.base):
     __tablename__ = 'person'
 
-    person_id = Column(String, primary_key=True)
+    # person_id = Column(String, primary_key=True)
+    person_id = Column(Integer, primary_key=True)
     collision_id = Column(Integer)
     crash_date = Column(Date)
     crash_time = Column(TIME)
@@ -65,7 +66,8 @@ class Vehicle(BaseModel.base):
     collision_id = Column(Integer)
     crash_date = Column(Date)
     crash_time = Column(TIME)
-    vehicle_id = Column(String, primary_key=True)
+    # vehicle_id = Column(String, primary_key=True)
+    vehicle_id = Column(Integer, primary_key=True)
     state_registration = Column(String)
     vehicle_type = Column(String)
     vehicle_make = Column(String)
@@ -119,7 +121,8 @@ map_person_columns = {
     'COLLISION_ID': 'collision_id',
     'CRASH_DATE': 'crash_date',
     'CRASH_TIME': 'crash_time',
-    'PERSON_ID': 'person_id',
+    # 'PERSON_ID': 'person_id',
+    'UNIQUE_ID': 'person_id',
     'PERSON_TYPE': 'person_type',
     'PERSON_INJURY': 'person_injury',
     'VEHICLE_ID': 'vehicle_id',
@@ -142,7 +145,8 @@ map_vehicle_columns = {
     'COLLISION_ID': 'collision_id',
     'CRASH_DATE': 'crash_date',
     'CRASH_TIME': 'crash_time',
-    'VEHICLE_ID': 'vehicle_id',
+    # 'VEHICLE_ID': 'vehicle_id',
+    'UNIQUE_ID': 'vehicle_id',
     'STATE_REGISTRATION': 'state_registration',
     'VEHICLE_TYPE': 'vehicle_type',
     'VEHICLE_MAKE': 'vehicle_make',
@@ -163,5 +167,4 @@ map_vehicle_columns = {
     'PUBLIC_PROPERTY_DAMAGE_TYPE': 'public_property_damage_type',
     'CONTRIBUTING_FACTOR_1': 'contributing_factor_1',
     'CONTRIBUTING_FACTOR_2': 'contributing_factor_2'
-
 }
