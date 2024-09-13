@@ -5,8 +5,7 @@ Dataset URLs:
 https://catalog.data.gov/dataset/motor-vehicle-collisions-crashes
 https://catalog.data.gov/dataset/motor-vehicle-collisions-vehicles
 https://catalog.data.gov/dataset/motor-vehicle-collisions-person
-or 
-https://github.com/Kalyani-NCI/motorcollison/tree/main/Data
+
 
 Steps to be followed for code execution:
 
