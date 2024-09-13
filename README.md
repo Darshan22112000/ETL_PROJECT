@@ -1,54 +1,54 @@
-# ETL Project : Motor Collison
 
-Dataset URLs:
-https://catalog.data.gov/dataset/motor-vehicle-collisions-crashes
-https://catalog.data.gov/dataset/motor-vehicle-collisions-vehicles
-https://catalog.data.gov/dataset/motor-vehicle-collisions-person
-or 
-https://github.com/Darshan22112000/etl_project/tree/main/Data
+---
+# ETL Project: Motor Collision Analysis
 
-Steps to be followed for code execution:
+### Dataset URLs:
+- [Motor Vehicle Collisions - Crashes](https://catalog.data.gov/dataset/motor-vehicle-collisions-crashes)
+- [Motor Vehicle Collisions - Vehicles](https://catalog.data.gov/dataset/motor-vehicle-collisions-vehicles)
+- [Motor Vehicle Collisions - Person](https://catalog.data.gov/dataset/motor-vehicle-collisions-person)
 
-1.Installation Docker
-  https://docs.docker.com/get-docker/
+### Steps for Code Execution:
 
-2. Create a folder in your local system where you run docker containers
+1. **Install Docker**: [Docker Installation Guide](https://docs.docker.com/get-docker/)
+   
+2. **Setup Docker Environment**:
+   - Create a folder on your system for Docker containers.
+   - Add the following files (from `docker_files`):
+     - `mongoDB.env`
+     - `postgresql.env`
+     - `docker-compose.yml`
+   - Open the folder in your terminal and run:
+     ```
+     docker-compose up
+     ```
 
-3. Put 3 files in a folder given below (from docker_files):
-  i. mongoDB.env
- ii. postgresql.env
-iii. docker-compose.yml
+3. **Install PostgreSQL, pgAdmin, and MongoDB Compass**:
+   - Create databases using the `ddl.sql` file.
 
-4. Go to folder path in command prompt in above created folder
+4. **Clone Project**:
+   ```
+   git clone https://github.com/Darshan22112000/etl_project.git
+   ```
+   - Open the project in your IDE.
 
-5. Run below command
-	docker-compose up
+5. **Install Python Dependencies**:
+   ```
+   pip install -r requirements.txt
+   ```
 
-6. Download postgreSQL(server) , pgadmin and mongodbcompass in your local system.
+6. **Run Dagster Pipeline**:
+   - Start the Dagster server:
+     ```
+     dagit -f .\dagster_etl.py
+     ```
+   - Access the server: [http://127.0.0.1:3000](http://127.0.0.1:3000/)
+   - Navigate to "Launchpad", and click the **Launch Run** button.
+   - A new tab will display Bokeh visualizations upon completion.
 
-7. Create a new database in your PostgresSQL and in MongoDB using ddl.sql
+7. **Run Luigi Job**:
+   ```
+   python .\luigi_etl.py
+   ```
+   - A new tab will open with the Bokeh visualizations after job completion.
 
-8. Git clone project:- motocollision in your system, run below cmd
-git clone https://github.com/Darshan22112000/etl_project.git
-
-9. Open project in IDE
-
-10. Goto terminal,run following command to download libraries
-
-	pip install -r requirements.txt
-
-11. Once all dependencied are installed, run dagster pipeline using below cmd
- dagit -f .\dagster_etl.py  
- 
-12. Goto Web dagster server using http://127.0.0.1:3000/  
-
-13. Navigate to Launchpad--> Click on the Launchpad tab, then click on the Launch Run button located at the bottom right of the page.
-
-14. When the job is completed, a new tab will open containing the Bokeh visualisation.
-
-15. To Trigger Luigi job run below command in the terminal
-python .\luigi_etl.py
-
-16. When the job is completed, a new tab will open containing the Bokeh visualisation.
-
-
+---
